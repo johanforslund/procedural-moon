@@ -4,6 +4,41 @@ vec2 hash( vec2 p ) // replace this by something better
 	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
 }
 
+// Determines how many cells there are
+#define NUM_CELLS 16.0
+
+// Returns the point in a given cell
+vec2 get_cell_point(ivec2 cell) {
+	vec2 cell_base = vec2(cell) / NUM_CELLS;
+	vec2 noise = hash(vec2(cell));
+    return cell_base + (0.5 + 1.5 * noise) / NUM_CELLS;
+}
+
+// Performs worley noise by checking all adjacent cells
+// and comparing the distance to their pointsNch
+vec2 worley(vec2 coord) {
+    ivec2 cell = ivec2(coord * NUM_CELLS);
+    float closest_dist = 1.0;
+    vec2 closest_cell_point;
+    
+    // Search in the surrounding 5x5 cell block
+    for (int x = 0; x < 5; x++) { 
+        for (int y = 0; y < 5; y++) {
+        	vec2 cell_point = get_cell_point(cell + ivec2(x-2, y-2));
+            float dist = distance(cell_point, coord);
+            if (dist < closest_dist) {
+            	closest_dist = dist;
+                closest_cell_point = cell_point;
+            }
+
+        }
+    }
+    
+    closest_dist /= length(vec2(1.0 / NUM_CELLS));
+    closest_dist = 1.0 - closest_dist;
+    return vec2(closest_dist, closest_cell_point.x*869.0+closest_cell_point.y*487.0);
+}
+
 float noise( in vec2 p )
 {
     const float K1 = 0.366025404; // (sqrt(3)-1)/2;
@@ -101,9 +136,16 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
 vec2 map(in vec3 pos) {
 	vec2 d1 = vec2(1000000.0, -1.0); // Substitute with other object
     
+    //float floorHeight = 0.0;
     //float floorHeight = 3.0 - heteroFbm(vec2(pos.xz)*0.03, 1.0, 2.5, 1.1); // Create fractal noise
     float floorHeight = 1.0 - hybridFbm(vec2(pos.xz)*0.03, 0.27, 4.5, 0.5); // Create fractal noise
     //float floorHeight = 1.0 - fbm(pos.xz*0.13);
+    
+    //vec3 voro = smoothstep(0.0, 1.0, voronoi(pos.xz));
+    //floorHeight += 0.5*voro.x;
+    
+    vec2 worl = worley(pos.xz*0.008);
+    floorHeight += smoothstep(0.84 + 0.1*fract(worl.y), 0.89 + 0.1*fract(worl.y), worl.x)*0.3;
         
     float d2 = pos.y + floorHeight;
     
