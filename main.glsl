@@ -1,20 +1,23 @@
-float hash(vec2 p)  // replace this by something better
+vec2 hash( vec2 p ) // replace this by something better
 {
-    p  = 50.0*fract( p*0.3183099 + vec2(0.71,0.113));
-    return -1.0+2.0*fract( p.x*p.y*(p.x+p.y) );
+	p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
+	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
 }
 
 float noise( in vec2 p )
 {
-    vec2 i = floor( p );
-    vec2 f = fract( p );
-	
-	vec2 u = f*f*(3.0-2.0*f);
+    const float K1 = 0.366025404; // (sqrt(3)-1)/2;
+    const float K2 = 0.211324865; // (3-sqrt(3))/6;
 
-    return mix( mix( hash( i + vec2(0.0,0.0) ), 
-                     hash( i + vec2(1.0,0.0) ), u.x),
-                mix( hash( i + vec2(0.0,1.0) ), 
-                     hash( i + vec2(1.0,1.0) ), u.x), u.y);
+	vec2  i = floor( p + (p.x+p.y)*K1 );
+    vec2  a = p - i + (i.x+i.y)*K2;
+    float m = step(a.y,a.x); 
+    vec2  o = vec2(m,1.0-m);
+    vec2  b = a - o + K2;
+	vec2  c = a - 1.0 + 2.0*K2;
+    vec3  h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
+	vec3  n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
+    return dot( n, vec3(70.0) );
 }
 
 #define OCTAVES 6
@@ -22,7 +25,6 @@ float fbm (in vec2 st) {
     // Initial values
     float value = 0.0;
     float amplitude = .5;
-    float frequency = 0.;
     //
     // Loop of octaves
     for (int i = 0; i < OCTAVES; i++) {
@@ -33,11 +35,76 @@ float fbm (in vec2 st) {
     return value;
 }
 
+// From "Texturing and Modeling, a Procedural Approach"
+float heteroFbm(in vec2 point, float H, float lacunarity, float offset) {
+	float[OCTAVES+1] expArray;
+    float frequency = 1.0;
+    
+    for (int i=0; i<=OCTAVES; i++) {
+    	expArray[i] = pow(frequency, -H);
+        frequency *= lacunarity;
+    }
+    
+    float value = offset + noise(point);
+    point.x *= lacunarity;
+    point.y *= lacunarity;
+    
+    float increment;
+    
+    for (int i=1; i<OCTAVES; i++) {
+     	increment = noise(point) + offset;
+        increment *= expArray[i];
+        increment *= value;
+        value += increment;
+        
+        point.x *= lacunarity;
+        point.y *= lacunarity;
+    }
+    
+    
+    return value;
+}
+
+// From "Texturing and Modeling, a Procedural Approach"
+float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
+    float[OCTAVES+1] expArray;
+    float frequency = 1.0;
+    
+    for (int i=0; i<=OCTAVES; i++) {
+    	expArray[i] = pow(frequency, -H);
+        frequency *= lacunarity;
+    }
+    
+    float result = (noise(point) + offset) * expArray[0];
+    float weight = result;
+    
+    point.x *= lacunarity;
+    point.y *= lacunarity;
+    
+    for (int i=1; i<OCTAVES; i++) {
+     	if (weight > 1.0) weight = 1.0;
+        
+        float signal = (noise(point) + offset) * expArray[i];
+        
+        result += weight * signal;
+        
+        weight *= signal;
+        
+        point.x *= lacunarity;
+        point.y *= lacunarity;
+    }
+    
+    return result;
+}
+
 // Returns the closest object to 'pos' as vec2(closest distance, unique id)
 vec2 map(in vec3 pos) {
 	vec2 d1 = vec2(1000000.0, -1.0); // Substitute with other object
     
-    float floorHeight = 1.0 - fbm(vec2(pos.xz)*0.15); // Create fractal noise
+    //float floorHeight = 3.0 - heteroFbm(vec2(pos.xz)*0.03, 1.0, 2.5, 1.1); // Create fractal noise
+    float floorHeight = 1.0 - hybridFbm(vec2(pos.xz)*0.03, 0.27, 4.5, 0.5); // Create fractal noise
+    //float floorHeight = 1.0 - fbm(pos.xz*0.13);
+        
     float d2 = pos.y + floorHeight;
     
     return (d2<d1.x) ? vec2(d2, 1.0) : d1;
@@ -56,7 +123,7 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
     float t = 0.0;
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<1000; i++) {
     	vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -76,7 +143,7 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
 vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
     float id = -1.0;
  	float t = 0.0;
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<1000; i++) {
         vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -87,9 +154,9 @@ vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
         
         t += closestDistance;
         
-        if (t>20.0) break; // Break if we go too far
+        if (t>40.0) break; // Break if we go too far
     }
-    if (t>20.0) id = -1.0;
+    if (t>40.0) id = -1.0;
     return vec2(t, id);
 }
 
@@ -97,7 +164,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 p = (2.0*fragCoord-iResolution.xy)/iResolution.y; // Normalize screen space to [-1, 1]
     
-    vec3 target = vec3(0.0 + iTime, 0.95, 0.0 + iTime);
+    vec3 target = vec3(0.0 + iTime*2.0, 0.95, 0.0 + iTime*2.0);
     vec3 rayOrigin = target + vec3(0.2*sin(iTime), 0.0, -1.5);
     
     // Setup camera system
@@ -108,7 +175,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 rayDirection = normalize(p.x*right + p.y*up + 1.8*forward); // Direct rays through camera plane
 
     vec3 col = vec3(0.01, 0.01, 0.01) - 0.01*rayDirection.y; // Sky color with tint towards horizon
-    col = mix(col, vec3(0.03, 0.03, 0.03), exp(-20.0*rayDirection.y)); // Grayish fog towards horizon
+    col = mix(col, vec3(0.02, 0.02, 0.02), exp(-20.0*rayDirection.y)); // Grayish fog towards horizon
     
     vec2 closestObject = castRay(rayOrigin, rayDirection);
     float closestId = closestObject.y;
