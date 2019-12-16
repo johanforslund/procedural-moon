@@ -119,10 +119,12 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
     for (int i=1; i<OCTAVES; i++) {
      	if (weight > 1.0) weight = 1.0;
         
+        if (i < 4 && i > 2) weight = weight + 0.03*sin(point.x*1.3)*sin(point.y);
+        
         float signal = (noise(point) + offset) * expArray[i];
         
         result += weight * signal;
-        
+                
         weight *= signal;
         
         point.x *= lacunarity;
