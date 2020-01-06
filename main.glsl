@@ -138,7 +138,7 @@ float sdfSphere( vec3 p, float s )
 vec2 sdfStones(in vec3 pos) {
     vec3 q = vec3(mod(abs(pos.x), 8.0)-1.5, pos.y, mod(pos.z+1.5, 9.0)-1.5); // Local coordinate system
     
-    vec2 id = vec2( floor(pos.x/3.0), floor((pos.z+1.5)/3.0) );
+    vec2 id = vec2( floor(pos.x/8.0), floor((pos.z+1.5)/8.0) );
     float fid = id.x*11.1 + id.y*31.7;
     
     float radius = 0.5*sin(fid*32.2) + 0.05*noise(pos.xz*3.0);
@@ -192,13 +192,13 @@ vec3 calcNormal(in vec3 pos) {
 float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
-    float t = 0.2;
-    float tmax = 20.0;
+    float t = 0.3;
+    float tmax = 40.0;
     
     float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
-    for (int i=0; i<256; i++) {
+    for (int i=0; i<64; i++) {
     	vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -223,7 +223,7 @@ vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
     float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
-    for (int i=0; i<256; i++) {
+    for (int i=0; i<64; i++) {
         vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -282,7 +282,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         }
         
         
-        vec3 sunDirection = normalize(vec3(0.8, 0.4, 0.2));
+        vec3 sunDirection = normalize(vec3(0.8, 0.4, 0.5));
                 
         // Use basic lightning model where intensity depends on normal direction relative to light source
         float sunDiffuse = clamp(dot(normal, sunDirection), 0.0, 1.0);
