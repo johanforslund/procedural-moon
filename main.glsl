@@ -130,10 +130,26 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
     return result;
 }
 
+float sdfSphere( vec3 p, float s )
+{
+    return length(p)-s;
+}
+
+vec2 sdfStones(in vec3 pos) {
+    vec3 q = vec3(mod(abs(pos.x), 8.0)-1.5, pos.y, mod(pos.z+1.5, 9.0)-1.5); // Local coordinate system
+    
+    vec2 id = vec2( floor(pos.x/3.0), floor((pos.z+1.5)/3.0) );
+    float fid = id.x*11.1 + id.y*31.7;
+    
+    float radius = 0.5*sin(fid*32.2) + 0.05*noise(pos.xz*3.0);
+    
+    float sphere = sdfSphere(q - 0.0*vec3(0.0, radius, 0.0), radius);
+    
+    return vec2(sphere, 2.0);
+}
+
 // Returns the closest object to 'pos' as vec2(closest distance, unique id)
 vec2 map(in vec3 pos) {
-	vec2 d1 = vec2(1000000.0, -1.0); // Substitute with other object
-    
     //float floorHeight = 1.0;
     //float floorHeight = 3.0 - heteroFbm(vec2(pos.xz)*0.03, 1.0, 2.5, 1.1); // Create fractal noise
     float floorHeight = 1.0 - hybridFbm(vec2(pos.xz)*0.03, 0.27, 4.5, 0.5); // Create fractal noise
@@ -142,8 +158,9 @@ vec2 map(in vec3 pos) {
     //vec3 voro = smoothstep(0.0, 1.0, voronoi(pos.xz));
     //floorHeight += 0.5*voro.x;
     
+    vec2 worl = worley(pos.xz*0.008); // Worley noise
+    
     if (floorHeight > 0.1) { // Only render craters at lower altitudes
-        vec2 worl = worley(pos.xz*0.008); // Worley noise
         // Use the fractal from cell ID to generate random cell sizes
         float innerCrater = 0.83 + 0.2*fract(worl.y);
         float outerCrater = 0.74 + 0.2*fract(worl.y);
@@ -156,9 +173,11 @@ vec2 map(in vec3 pos) {
         }
     }
     
-    float d2 = pos.y + floorHeight;
+    vec2 d1 = sdfStones(pos + vec3(0.0, floorHeight, 0.0));
     
-    return (d2<d1.x) ? vec2(d2, 1.0) : d1;
+    vec2 d2 = vec2(pos.y + floorHeight, 1.0);
+    
+    return (d2.x<d1.x) ? d2 : d1;
 }
 
 vec3 calcNormal(in vec3 pos) {
@@ -173,13 +192,13 @@ vec3 calcNormal(in vec3 pos) {
 float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
-    float t = 0.5;
+    float t = 0.2;
     float tmax = 20.0;
     
     float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
-    for (int i=0; i<512; i++) {
+    for (int i=0; i<256; i++) {
     	vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -198,13 +217,13 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
 
 vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
     float id = -1.0;
- 	float t = 0.5;
+ 	float t = 0.2;
     float tmax = 40.0;
     
     float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
-    for (int i=0; i<512; i++) {
+    for (int i=0; i<256; i++) {
         vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -226,7 +245,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 p = (2.0*fragCoord-iResolution.xy)/iResolution.y; // Normalize screen space to [-1, 1]
     
-    vec3 target = vec3(0.0 + iTime*6.0, 0.95, iTime*6.0);
+    vec3 target = vec3(0.0 + iTime*4.0, 0.95, iTime*6.0);
     vec3 rayOrigin = target + vec3(0.2*sin(iTime), 0.0, -1.5);
     
     // Setup camera system
@@ -255,7 +274,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         } else if (closestId>2.5) {
         	materialColor = vec3(0.4);   
         } else if (closestId>1.5) {
-           	materialColor = vec3(0.2, 0.1 , 0.02);
+           	materialColor = vec3(0.09, 0.1 , 0.1);
         } else { // Terrain
           	materialColor = vec3(0.09, 0.1, 0.1);
            	//float f = -1.0+2.0*smoothstep(-0.5, 0.5, sin(2.0*pos.x)+sin(4.0*pos.y));
