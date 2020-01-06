@@ -11,7 +11,7 @@ vec2 hash( vec2 p ) // replace this by something better
 vec2 get_cell_point(ivec2 cell) {
 	vec2 cell_base = vec2(cell) / NUM_CELLS;
 	vec2 noise = hash(vec2(cell));
-    return cell_base + (0.5 + 1.5 * noise) / NUM_CELLS;
+    return cell_base + (0.5 + 0.25 * noise) / NUM_CELLS;
 }
 
 // Performs worley noise by checking all adjacent cells
@@ -55,7 +55,7 @@ float noise( in vec2 p )
     return dot( n, vec3(70.0) );
 }
 
-#define OCTAVES 6
+#define OCTAVES 5
 float fbm (in vec2 st) {
     // Initial values
     float value = 0.0;
@@ -100,17 +100,11 @@ float heteroFbm(in vec2 point, float H, float lacunarity, float offset) {
     return value;
 }
 
-// From "Texturing and Modeling, a Procedural Approach"
+// Based on "Texturing and Modeling, a Procedural Approach"
 float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
-    float[OCTAVES+1] expArray;
-    float frequency = 1.0;
+    float frequency = lacunarity;
     
-    for (int i=0; i<=OCTAVES; i++) {
-    	expArray[i] = pow(frequency, -H);
-        frequency *= lacunarity;
-    }
-    
-    float result = (noise(point) + offset) * expArray[0];
+    float result = (noise(point) + offset);
     float weight = result;
     
     point.x *= lacunarity;
@@ -119,9 +113,11 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
     for (int i=1; i<OCTAVES; i++) {
      	if (weight > 1.0) weight = 1.0;
         
+        // Prevent large completely smooth areas
         if (i < 4 && i > 2) weight = weight + 0.03*sin(point.x*1.3)*sin(point.y);
         
-        float signal = (noise(point) + offset) * expArray[i];
+        float signal = (noise(point) + offset) * pow(frequency, -H);
+        frequency *= lacunarity;
         
         result += weight * signal;
                 
@@ -138,7 +134,7 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
 vec2 map(in vec3 pos) {
 	vec2 d1 = vec2(1000000.0, -1.0); // Substitute with other object
     
-    //float floorHeight = 0.0;
+    //float floorHeight = 1.0;
     //float floorHeight = 3.0 - heteroFbm(vec2(pos.xz)*0.03, 1.0, 2.5, 1.1); // Create fractal noise
     float floorHeight = 1.0 - hybridFbm(vec2(pos.xz)*0.03, 0.27, 4.5, 0.5); // Create fractal noise
     //float floorHeight = 1.0 - fbm(pos.xz*0.13);
@@ -146,9 +142,20 @@ vec2 map(in vec3 pos) {
     //vec3 voro = smoothstep(0.0, 1.0, voronoi(pos.xz));
     //floorHeight += 0.5*voro.x;
     
-    vec2 worl = worley(pos.xz*0.008);
-    floorHeight += smoothstep(0.84 + 0.1*fract(worl.y), 0.89 + 0.1*fract(worl.y), worl.x)*0.3;
-        
+    if (floorHeight > 0.1) { // Only render craters at lower altitudes
+        vec2 worl = worley(pos.xz*0.008); // Worley noise
+        // Use the fractal from cell ID to generate random cell sizes
+        float innerCrater = 0.83 + 0.2*fract(worl.y);
+        float outerCrater = 0.74 + 0.2*fract(worl.y);
+
+        floorHeight += smoothstep(outerCrater, innerCrater, worl.x)*0.4; // Erosion
+
+        // This is used to create an outer elevation around the crater
+        if (worl.x > outerCrater - 0.05 && worl.x < outerCrater) {
+            floorHeight -= 0.08*smoothstep(outerCrater - 0.05, outerCrater, worl.x);
+        }
+    }
+    
     float d2 = pos.y + floorHeight;
     
     return (d2<d1.x) ? vec2(d2, 1.0) : d1;
@@ -166,8 +173,13 @@ vec3 calcNormal(in vec3 pos) {
 float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
-    float t = 0.0;
-    for (int i=0; i<1000; i++) {
+    float t = 0.5;
+    float tmax = 20.0;
+    
+    float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
+    if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
+    
+    for (int i=0; i<512; i++) {
     	vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -175,10 +187,10 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
         
         res = min(res, 16.0*closestDistance/t); // Track the closest the ray were to hitting another object
         
-        if (closestDistance<0.001) break; // Break if we are going inside object
+        if (abs(closestDistance)<0.001*t) break; // Break if we are going inside object
         
-        t += closestDistance;
-        if (t>20.0) break; // Break if we go too far
+        t += clamp(closestDistance, 0.1, 0.8);
+        if (t>tmax) break; // Break if we go too far
     }
     
     return clamp(res, 0.0, 1.0);
@@ -186,21 +198,27 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
 
 vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
     float id = -1.0;
- 	float t = 0.0;
-    for (int i=0; i<1000; i++) {
+ 	float t = 0.5;
+    float tmax = 40.0;
+    
+    float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
+    if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
+    
+    for (int i=0; i<512; i++) {
         vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
         float closestDistance = closestObject.x;
         id = closestObject.y;
         
-        if (closestDistance<0.001) break; // Break if we are going inside object
+        // Break if we are going inside object.
+        if (abs(closestDistance)<0.001*t) break; // Multiplication by t makes ray marching stop earlier at far distance
         
         t += closestDistance;
         
-        if (t>40.0) break; // Break if we go too far
+        if (t>tmax) break; // Break if we go too far
     }
-    if (t>40.0) id = -1.0;
+    if (t>tmax) id = -1.0;
     return vec2(t, id);
 }
 
@@ -208,7 +226,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     vec2 p = (2.0*fragCoord-iResolution.xy)/iResolution.y; // Normalize screen space to [-1, 1]
     
-    vec3 target = vec3(0.0 + iTime*2.0, 0.95, 0.0 + iTime*2.0);
+    vec3 target = vec3(0.0 + iTime*6.0, 0.95, iTime*6.0);
     vec3 rayOrigin = target + vec3(0.2*sin(iTime), 0.0, -1.5);
     
     // Setup camera system
@@ -239,23 +257,22 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         } else if (closestId>1.5) {
            	materialColor = vec3(0.2, 0.1 , 0.02);
         } else { // Terrain
-          	materialColor = vec3(0.11, 0.11, 0.1);
-           	//float f = -1.0+2.0*smoothstep(-0.2, 0.2, sin(18.0*pos.x)+sin(18.0*pos.y)+sin(18.0*pos.z));
-           	//materialColor += 0.2*f*vec3(0.06, 0.06, 0.02);
+          	materialColor = vec3(0.09, 0.1, 0.1);
+           	//float f = -1.0+2.0*smoothstep(-0.5, 0.5, sin(2.0*pos.x)+sin(4.0*pos.y));
+           	//materialColor += 0.1*f*vec3(0.09, 0.1, 0.1);
         }
         
         
         vec3 sunDirection = normalize(vec3(0.8, 0.4, 0.2));
-        
+                
         // Use basic lightning model where intensity depends on normal direction relative to light source
         float sunDiffuse = clamp(dot(normal, sunDirection), 0.0, 1.0);
         float sunShadow = castShadow(pos+normal*0.001, sunDirection); // Check if surface point can see the sun
-        float skyDiffuse = clamp(0.5 + 0.5*dot(normal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-        float bounceDiffuse = clamp(0.5 + 0.5*dot(normal, vec3(0.0, -1.0, 0.0)), 0.0, 1.0);
+        float skyDiffuse = 0.2*clamp(0.5 + 0.5*dot(normal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
         
    		col = materialColor*vec3(5.0, 4.5, 5.0)*sunDiffuse*sunShadow;
         col += materialColor*vec3(0.5, 0.8, 0.9)*skyDiffuse;
-        col += materialColor*vec3(0.3, 0.3, 0.2)*bounceDiffuse;
+        //col += materialColor*vec3(0.5, 0.7,1.0)*skyDiffuse*occ;
     }
     
     col = pow(col, vec3(0.4545)); // Gamma correction
