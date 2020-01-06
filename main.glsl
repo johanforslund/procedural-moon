@@ -1,17 +1,17 @@
-vec2 hash( vec2 p ) // replace this by something better
+vec2 hash( vec2 p ) // Used when creating noise
 {
 	p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
 	return -1.0 + 2.0*fract(sin(p)*43758.5453123);
 }
 
-// Determines how many cells there are
+// Determines how many cells there should be for worley noise
 #define NUM_CELLS 16.0
 
-// Returns the point in a given cell
+// Returns the point in a given cell (used in worley)
 vec2 get_cell_point(ivec2 cell) {
 	vec2 cell_base = vec2(cell) / NUM_CELLS;
 	vec2 noise = hash(vec2(cell));
-    return cell_base + (0.5 + 0.25 * noise) / NUM_CELLS;
+    return cell_base + (0.5 + 0.1 * noise) / NUM_CELLS;
 }
 
 // Performs worley noise by checking all adjacent cells
@@ -160,7 +160,7 @@ vec2 map(in vec3 pos) {
     
     vec2 worl = worley(pos.xz*0.008); // Worley noise
     
-    if (floorHeight > 0.1) { // Only render craters at lower altitudes
+    if(worl.x > 0.73) {
         // Use the fractal from cell ID to generate random cell sizes
         float innerCrater = 0.83 + 0.2*fract(worl.y);
         float outerCrater = 0.74 + 0.2*fract(worl.y);
@@ -170,7 +170,7 @@ vec2 map(in vec3 pos) {
         // This is used to create an outer elevation around the crater
         if (worl.x > outerCrater - 0.05 && worl.x < outerCrater) {
             floorHeight -= 0.08*smoothstep(outerCrater - 0.05, outerCrater, worl.x);
-        }
+        }  
     }
     
     vec2 d1 = sdfStones(pos + vec3(0.0, floorHeight, 0.0));
@@ -192,13 +192,13 @@ vec3 calcNormal(in vec3 pos) {
 float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
-    float t = 0.3;
+    float t = 0.1;
     float tmax = 40.0;
     
     float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
-    for (int i=0; i<64; i++) {
+    for (int i=0; i<50; i++) {
     	vec3 pos = rayOrigin + t*rayDirection; // Take a step in ray direction
         
         vec2 closestObject = map(pos);
@@ -208,8 +208,8 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
         
         if (abs(closestDistance)<0.001*t) break; // Break if we are going inside object
         
-        t += clamp(closestDistance, 0.1, 0.8);
-        if (t>tmax) break; // Break if we go too far
+        t += clamp(closestDistance, 0.05, 0.4);
+        if (t>tmax || res < 0.005) break; // Break if we go too far
     }
     
     return clamp(res, 0.0, 1.0);
@@ -258,6 +258,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 col = vec3(0.01, 0.01, 0.01) - 0.01*rayDirection.y; // Sky color with tint towards horizon
     col = mix(col, vec3(0.02, 0.02, 0.02), exp(-20.0*rayDirection.y)); // Grayish fog towards horizon
     
+    vec3 starColor = vec3(1.0, 1.0, 0.9);
+    col += (0.6 + 0.4*sin(iTime*12.0+p.x*80.0)*sin(iTime*24.0+p.y*80.0)) * starColor * 0.1 * (1.0 - step(noise(vec2(p.x, p.y)*40.0), 0.8));
+    
     vec2 closestObject = castRay(rayOrigin, rayDirection);
     float closestId = closestObject.y;
     
@@ -266,14 +269,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         vec3 pos = rayOrigin + t*rayDirection; // Point on object surface
         vec3 normal = calcNormal(pos);
         
-        vec3 materialColor = vec3(0.18);
+        vec3 materialColor;
         
         // Material color is chosen depending on object ID
-        if (closestId>3.5) {
-        	materialColor = vec3(0.02);   
-        } else if (closestId>2.5) {
-        	materialColor = vec3(0.4);   
-        } else if (closestId>1.5) {
+        if (closestId>1.5) {
            	materialColor = vec3(0.09, 0.1 , 0.1);
         } else { // Terrain
           	materialColor = vec3(0.09, 0.1, 0.1);
@@ -291,7 +290,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         
    		col = materialColor*vec3(5.0, 4.5, 5.0)*sunDiffuse*sunShadow;
         col += materialColor*vec3(0.5, 0.8, 0.9)*skyDiffuse;
-        //col += materialColor*vec3(0.5, 0.7,1.0)*skyDiffuse*occ;
     }
     
     col = pow(col, vec3(0.4545)); // Gamma correction
