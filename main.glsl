@@ -161,9 +161,9 @@ vec2 map(in vec3 pos) {
     vec2 worl = worley(pos.xz*0.008); // Worley noise
     
     if(worl.x > 0.73) {
-        // Use the fractal from cell ID to generate random cell sizes
-        float innerCrater = 0.83 + 0.2*fract(worl.y);
-        float outerCrater = 0.74 + 0.2*fract(worl.y);
+        // Use the cell ID to generate random cell sizes
+        float innerCrater = 0.83 + 0.2*(0.5 + 0.5*sin(worl.y*33.5));
+        float outerCrater = 0.74 + 0.2*(0.5 + 0.5*sin(worl.y*33.5));
 
         floorHeight += smoothstep(outerCrater, innerCrater, worl.x)*0.4; // Erosion
 
