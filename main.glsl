@@ -288,7 +288,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
         float skyDiffuse = 0.2*clamp(0.5 + 0.5*dot(normal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
         
    		col = materialColor*vec3(5.0, 4.5, 5.0)*sunDiffuse*sunShadow;
-        col += materialColor*vec3(0.5, 0.8, 0.9)*skyDiffuse;
+        col += 0.2*materialColor*vec3(0.5, 0.8, 0.9)*skyDiffuse;
     }
     
     col = pow(col, vec3(0.4545)); // Gamma correction
