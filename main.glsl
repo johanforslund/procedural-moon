@@ -14,14 +14,12 @@ vec2 get_cell_point(ivec2 cell) {
     return cell_base + (0.5 + 0.1 * noise) / NUM_CELLS;
 }
 
-// Performs worley noise by checking all adjacent cells
-// and comparing the distance to their pointsNch
+// Worley noise
 vec2 worley(vec2 coord) {
     ivec2 cell = ivec2(coord * NUM_CELLS);
     float closest_dist = 1.0;
     vec2 closest_cell_point;
     
-    // Search in the surrounding 5x5 cell block
     for (int x = 0; x < 5; x++) { 
         for (int y = 0; y < 5; y++) {
         	vec2 cell_point = get_cell_point(cell + ivec2(x-2, y-2));
@@ -39,6 +37,7 @@ vec2 worley(vec2 coord) {
     return vec2(closest_dist, closest_cell_point.x*869.0+closest_cell_point.y*487.0);
 }
 
+// Perlin noise
 float noise( in vec2 p )
 {
     const float K1 = 0.366025404; // (sqrt(3)-1)/2;
@@ -100,7 +99,7 @@ float heteroFbm(in vec2 point, float H, float lacunarity, float offset) {
     return value;
 }
 
-// Based on "Texturing and Modeling, a Procedural Approach"
+// Based on code from "Texturing and Modeling, a Procedural Approach"
 float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
     float frequency = lacunarity;
     
@@ -111,7 +110,7 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
     point.y *= lacunarity;
     
     for (int i=1; i<OCTAVES; i++) {
-     	if (weight > 1.0) weight = 1.0;
+     	if (weight > 1.0) weight = 1.0; // To not overdo the signal scaling
         
         // Prevent large completely smooth areas
         if (i < 4 && i > 2) weight = weight + 0.03*sin(point.x*1.3)*sin(point.y);
@@ -119,7 +118,7 @@ float hybridFbm(in vec2 point, float H, float lacunarity, float offset) {
         float signal = (noise(point) + offset) * pow(frequency, -H);
         frequency *= lacunarity;
         
-        result += weight * signal;
+        result += weight * signal; // Scale the signal to smooth out valleys
                 
         weight *= signal;
         
@@ -138,10 +137,10 @@ float sdfSphere( vec3 p, float s )
 vec2 sdfStones(in vec3 pos) {
     vec3 q = vec3(mod(abs(pos.x), 8.0)-1.5, pos.y, mod(pos.z+1.5, 9.0)-1.5); // Local coordinate system
     
-    vec2 id = vec2( floor(pos.x/8.0), floor((pos.z+1.5)/8.0) );
-    float fid = id.x*11.1 + id.y*31.7;
+    vec2 id = vec2( floor(pos.x/8.0), floor((pos.z+1.5)/8.0) ); // Unique ID for each stone
+    float fid = id.x*11.1 + id.y*31.7; // Hash to a more random ID
     
-    float radius = 0.5*sin(fid*32.2) + 0.05*noise(pos.xz*3.0);
+    float radius = 0.5*sin(fid*32.2) + 0.05*noise(pos.xz*3.0); // Deform radius by using ID
     
     float sphere = sdfSphere(q - 0.0*vec3(0.0, radius, 0.0), radius);
     
@@ -155,12 +154,9 @@ vec2 map(in vec3 pos) {
     float floorHeight = 1.0 - hybridFbm(vec2(pos.xz)*0.03, 0.27, 4.5, 0.5); // Create fractal noise
     //float floorHeight = 1.0 - fbm(pos.xz*0.13);
     
-    //vec3 voro = smoothstep(0.0, 1.0, voronoi(pos.xz));
-    //floorHeight += 0.5*voro.x;
-    
     vec2 worl = worley(pos.xz*0.008); // Worley noise
     
-    if(worl.x > 0.73) {
+    if(worl.x > 0.68) {
         // Use the cell ID to generate random cell sizes
         float innerCrater = 0.83 + 0.2*(0.5 + 0.5*sin(worl.y*33.5));
         float outerCrater = 0.74 + 0.2*(0.5 + 0.5*sin(worl.y*33.5));
@@ -177,6 +173,7 @@ vec2 map(in vec3 pos) {
     
     vec2 d2 = vec2(pos.y + floorHeight, 1.0);
     
+    // Return the closest object
     return (d2.x<d1.x) ? d2 : d1;
 }
 
