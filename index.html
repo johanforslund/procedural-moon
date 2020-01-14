@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Moon</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #c {
+            width: 640px;
+            height: 360px;
+            display: block;
+            padding-left: 0;
+            padding-right: 0;
+            margin: 0 auto;
+        }
+
+        .slidecontainer {
+            width: 100%; /* Width of the outside container */
+            }
+
+            /* The slider itself */
+            .slider {
+            -webkit-appearance: none;  /* Override default CSS styles */
+            appearance: none;
+            width: 50%; /* Full-width */
+            height: 15px; /* Specified height */
+            background: #d3d3d3; /* Grey background */
+            outline: none; /* Remove outline */
+            opacity: 0.7; /* Set transparency (for mouse-over effects on hover) */
+            -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+            transition: opacity .2s;
+            }
+
+            /* Mouse-over effects */
+            .slider:hover {
+            opacity: 1; /* Fully shown on mouse-over */
+            }
+
+            /* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+            .slider::-webkit-slider-thumb {
+            -webkit-appearance: none; /* Override default look */
+            appearance: none;
+            width: 25px; /* Set a specific slider handle width */
+            height: 25px; /* Slider handle height */
+            background: #4CAF50; /* Green background */
+            cursor: pointer; /* Cursor on hover */
+            }
+
+            .slider::-moz-range-thumb {
+            width: 25px; /* Set a specific slider handle width */
+            height: 25px; /* Slider handle height */
+            background: #4CAF50; /* Green background */
+            cursor: pointer; /* Cursor on hover */
+            }
+
+            .button {
+            background-color: #4CAF50; /* Green */
+            border: none;
+            color: white;
+            padding: 8px 25px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 5px;
+            }
+
+    </style>
+    <script>
+        function changeColor(width, height){
+            document.getElementById('c').style.width = width;
+            document.getElementById('c').style.height = height;
+        }
+    </script>
+</head>
+
+<body style="font-family: Roboto;">
+    <div style="margin: 0 auto;">
+        <canvas id="c"></canvas>
+        <div style="justify-content: center; display: flex;">
+            <button class="button" onclick="changeColor('320px', '180px')" type="button">320 x 180</button>
+            <button class="button" onclick="changeColor('640px', '360px')" type="button">640 x 360</button>
+            <button class="button" onclick="changeColor('1280px', '720px')" type="button">1280 x 720</button>
+        </div>
+
+        <h3 style="text-align: center;">Parameters</h3>
+
+        <div style="width: 500px; margin: 0 auto; padding-left: 150px;">
+            <div style="float: left; width: 250px;">
+                <h4>Camera</h4>
+                <p>Camera angle</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="50" class="slider" id="cameraAngle">
+                </div>
+
+                <p>Camera speed</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="50" step="14" class="slider" id="cameraSpeed">
+                </div>
+
+                <p>View distance</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="40" class="slider" id="viewDistance">
+                </div>
+            </div>
+            <div style="float: right; width: 250px;">
+                <h4>World</h4>
+                <p>Altitudes</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="50" class="slider" id="altitudes">
+                </div>
+
+                <p>Lacunarity</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="50" class="slider" id="lacunarity">
+                </div>
+
+                <p>Amount of stones</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="10" class="slider" id="stonesAmount">
+                </div>
+
+                <p>Sun position</p>
+                <div class="slidecontainer">
+                    <input type="range" min="1" max="100" value="50" class="slider" id="sunPosition">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/three.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

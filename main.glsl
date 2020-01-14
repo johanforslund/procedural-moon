@@ -140,9 +140,9 @@ vec2 sdfStones(in vec3 pos) {
     vec2 id = vec2( floor(pos.x/8.0), floor((pos.z+1.5)/8.0) ); // Unique ID for each stone
     float fid = id.x*11.1 + id.y*31.7; // Hash to a more random ID
     
-    float radius = 0.5*sin(fid*32.2) + 0.05*noise(pos.xz*3.0); // Deform radius by using ID
+    float radius = 0.2*sin(fid*32.2) + 0.05*noise(pos.xz*3.0); // Deform radius by using ID
     
-    float sphere = sdfSphere(q - 0.0*vec3(0.0, radius, 0.0), radius);
+    float sphere = sdfSphere(q - 0.6*vec3(0.0, radius, 0.0), radius);
     
     return vec2(sphere, 2.0);
 }
@@ -169,6 +169,7 @@ vec2 map(in vec3 pos) {
         }  
     }
     
+    // Place stoness at floorHeight
     vec2 d1 = sdfStones(pos + vec3(0.0, floorHeight, 0.0));
     
     vec2 d2 = vec2(pos.y + floorHeight, 1.0);
@@ -190,9 +191,9 @@ float castShadow(in vec3 rayOrigin, vec3 rayDirection) {
  	float res = 1.0;
     
     float t = 0.1;
-    float tmax = 40.0;
+    float tmax = 20.0;
     
-    float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
+    float bt = (4.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 4.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
     for (int i=0; i<50; i++) {
@@ -217,7 +218,7 @@ vec2 castRay(in vec3 rayOrigin, vec3 rayDirection) {
  	float t = 0.2;
     float tmax = 40.0;
     
-    float bt = (2.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 2.0
+    float bt = (4.0 - rayOrigin.y)/rayDirection.y; // Find ray intersection with y = 4.0
     if (bt>0.0) tmax = min(tmax, bt); // Stop ray marching if above bt
     
     for (int i=0; i<64; i++) {
@@ -255,6 +256,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 col = vec3(0.01, 0.01, 0.01) - 0.01*rayDirection.y; // Sky color with tint towards horizon
     col = mix(col, vec3(0.02, 0.02, 0.02), exp(-20.0*rayDirection.y)); // Grayish fog towards horizon
     
+    // Add twinkling stars to background
     vec3 starColor = vec3(1.0, 1.0, 0.9);
     col += (0.6 + 0.4*sin(iTime*12.0+p.x*80.0)*sin(iTime*24.0+p.y*80.0)) * starColor * 0.1 * (1.0 - step(noise(vec2(p.x, p.y)*40.0), 0.8));
     
